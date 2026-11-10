@@ -1,0 +1,4 @@
+agent,weighted_connections,opponent_awareness,multiple_winning_moves
+weighted_connections,4,0,0
+opponent_awareness,4,4,0
+multiple_winning_moves,4,2,0
