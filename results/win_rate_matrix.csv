@@ -1,4 +1,0 @@
-agent,weighted_connections,opponent_awareness,multiple_winning_moves
-weighted_connections,0.5,0.0,0.0
-opponent_awareness,1.0,0.5,0.0
-multiple_winning_moves,1.0,0.5,0.0
