@@ -57,13 +57,16 @@ class Matrices:
 
     Off-diagonal cells count games between the two distinct heuristics. Diagonal
     (self-play) cells count each game once from each instance's perspective, so
-    ``games`` there is twice the number of self-play games.
+    ``games`` there is twice the number of self-play games. ``draw_rates`` uses the
+    same ``games`` denominator as ``win_rates`` (draws / games played against that
+    opponent), so it is symmetric: ``draw_rates[i][j] == draw_rates[j][i]``.
     """
     names: List[str]
     wins: List[List[int]]
     draws: List[List[int]]
     games: List[List[int]]
     win_rates: List[List[float]]
+    draw_rates: List[List[float]]
 
 
 @dataclass
@@ -155,9 +158,10 @@ def run_tournament(config: TournamentConfig = TournamentConfig(),
 
 # ------------------------------------------------------------------- analysis
 def compute_matrices(records: Sequence[GameRecord], names: Sequence[str]) -> Matrices:
-    """Aggregate win counts, draw counts and win rates.
+    """Aggregate win counts, draw counts, win rates and draw rates.
 
-    ``win_rate[i][j] = wins of i against j / games i played against j``.
+    ``win_rate[i][j] = wins of i against j / games i played against j`` and
+    ``draw_rate[i][j] = draws of i against j / games i played against j``.
     Distinct heuristics: the games between them (both first-player arrangements).
     Self-play (i == j): each game is counted once from each instance's perspective,
     so a decisive game adds 1 win (and 1 loss) and a draw adds 2 draws; the
@@ -188,7 +192,9 @@ def compute_matrices(records: Sequence[GameRecord], names: Sequence[str]) -> Mat
             wins[j][i] += 1
     win_rates = [[wins[i][j] / games[i][j] if games[i][j] else 0.0 for j in range(n)]
                  for i in range(n)]
-    return Matrices(list(names), wins, draws, games, win_rates)
+    draw_rates = [[draws[i][j] / games[i][j] if games[i][j] else 0.0 for j in range(n)]
+                  for i in range(n)]
+    return Matrices(list(names), wins, draws, games, win_rates, draw_rates)
 
 
 def heuristic_statistics(records: Sequence[GameRecord], names: Sequence[str]) -> Dict[str, dict]:

@@ -21,7 +21,12 @@ results/                   Generated outputs (overwritten on each run)
 
 ## Install
 
-Python 3.9+ is required. There are no third-party dependencies.
+Python 3.9+ is required. The engine itself has no third-party dependencies; `matplotlib`
+is used only to render the win/draw rate heatmap images.
+
+```
+pip install -r requirements.txt
+```
 
 ## Run
 
@@ -84,6 +89,8 @@ H3-H3). Each pairing plays 4 games (each side first twice), giving 24 games at d
 Each unordered pairing is played once; H2 vs H1 is read from the same games as H1 vs H2.
 
 `win_rate[row][col] = wins of row heuristic against col heuristic / games they played`.
+`draw_rate[row][col] = draws of row heuristic against col heuristic / games they played`
+(the same denominator, so it is symmetric: `draw_rate[i][j] == draw_rate[j][i]`).
 Draws are counted separately and are not wins.
 
 - Off-diagonal: the 4 games between two distinct heuristics.
@@ -100,11 +107,15 @@ the same game; this is expected.
 Written to `results/` (created if missing, overwritten each run, never appended):
 
 - `win_rate_matrix.csv` – win rates in [0, 1], rows = evaluated agent, columns = opponent
+- `draw_rate_matrix.csv` – draw rates in [0, 1], same row/column convention
 - `win_count_matrix.csv`, `draw_count_matrix.csv` – raw counts (same convention)
+- `win_rate_matrix.png`, `draw_rate_matrix.png` – heatmap visuals of the two rate
+  matrices above, rendered with matplotlib (`experiments/results.py::_save_heatmap`)
 - `game_results.csv` – one row per game: game number, first/second heuristic, instance,
   winner, moves, duration, average decision time and evaluated states per agent
-- `tournament_summary.json` – configuration (board, depth, games), matrices, and per
-  heuristic wins/losses/draws, win rate, decision time and nodes evaluated
+- `tournament_summary.json` – configuration (board, depth, games), matrices (including
+  win and draw rates), and per heuristic wins/losses/draws, win rate, decision time and
+  nodes evaluated
 
 "Nodes evaluated" counts terminal states plus heuristic evaluations during search.
 

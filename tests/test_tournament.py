@@ -66,6 +66,8 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(m.games[0][1], 4)
         self.assertAlmostEqual(m.win_rates[0][1], 0.5)
         self.assertAlmostEqual(m.win_rates[1][0], 0.25)
+        self.assertAlmostEqual(m.draw_rates[0][1], 0.25)
+        self.assertAlmostEqual(m.draw_rates[1][0], 0.25)  # symmetric with its own denominator
 
     def test_self_play_combined_perspective(self):
         a = NAMES[0]
@@ -76,10 +78,12 @@ class MatrixTests(unittest.TestCase):
         self.assertEqual(m.draws[0][0], 2)
         self.assertEqual(m.games[0][0], 8)
         self.assertAlmostEqual(m.win_rates[0][0], 3 / 8)
+        self.assertAlmostEqual(m.draw_rates[0][0], 2 / 8)
 
     def test_unplayed_cells_are_zero(self):
         m = compute_matrices([record(1, NAMES[0], NAMES[0], "first")], NAMES)
         self.assertEqual(m.win_rates[1][2], 0.0)
+        self.assertEqual(m.draw_rates[1][2], 0.0)
 
 
 class RealGameTests(unittest.TestCase):
@@ -114,6 +118,8 @@ class ResultsStorageTests(unittest.TestCase):
             save_results(first, out)
             for name in OUTPUT_FILES:
                 self.assertTrue((out / name).exists(), name)
+            self.assertGreater((out / "win_rate_matrix.png").stat().st_size, 0)
+            self.assertGreater((out / "draw_rate_matrix.png").stat().st_size, 0)
 
             with (out / "game_results.csv").open(newline="") as handle:
                 self.assertEqual(len(list(csv.reader(handle))), 25)
@@ -126,10 +132,14 @@ class ResultsStorageTests(unittest.TestCase):
             with (out / "win_rate_matrix.csv").open(newline="") as handle:
                 matrix_rows = list(csv.reader(handle))
             self.assertEqual(matrix_rows[0], ["agent", *NAMES[:2]])
+            with (out / "draw_rate_matrix.csv").open(newline="") as handle:
+                draw_matrix_rows = list(csv.reader(handle))
+            self.assertEqual(draw_matrix_rows[0], ["agent", *NAMES[:2]])
             summary = json.loads((out / "tournament_summary.json").read_text())
             self.assertEqual(summary["configuration"]["total_games"], len(small.records))
             self.assertEqual(summary["configuration"]["search_depth"], 1)
             self.assertEqual(summary["configuration"]["board_rows"], 6)
+            self.assertIn("draw_rate", summary["matrices"])
             self.assertIn(NAMES[0], summary["heuristic_statistics"])
 
     def test_format_matrix(self):

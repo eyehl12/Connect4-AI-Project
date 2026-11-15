@@ -8,6 +8,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Sequence
 
+import matplotlib
+matplotlib.use("Agg")  # headless/non-interactive backend; safe for scripts and tests
+import matplotlib.pyplot as plt
+
 from agents.heuristics import HEURISTIC_ABBREVIATIONS
 from experiments.tournament import GameRecord, Matrices, TournamentResult
 
@@ -18,8 +22,8 @@ GAME_COLUMNS = [
 ]
 
 OUTPUT_FILES = (
-    "win_rate_matrix.csv", "win_count_matrix.csv", "draw_count_matrix.csv",
-    "game_results.csv", "tournament_summary.json",
+    "win_rate_matrix.csv", "win_count_matrix.csv", "draw_rate_matrix.csv", "draw_count_matrix.csv",
+    "game_results.csv", "tournament_summary.json", "win_rate_matrix.png", "draw_rate_matrix.png",
 )
 
 
@@ -29,6 +33,30 @@ def _write_matrix(path: Path, names: Sequence[str], matrix, corner: str = "agent
         writer.writerow([corner, *names])
         for name, row in zip(names, matrix):
             writer.writerow([name, *row])
+
+
+def _save_heatmap(path: Path, names: Sequence[str], matrix, title: str, cmap: str = "YlGn") -> None:
+    """Render a rate matrix (values in [0, 1]) as an annotated heatmap PNG."""
+    labels = [HEURISTIC_ABBREVIATIONS.get(n, n) for n in names]
+    size = len(names)
+    fig, ax = plt.subplots(figsize=(1.6 * size + 2.2, 1.6 * size + 1.8))
+    image = ax.imshow(matrix, cmap=cmap, vmin=0.0, vmax=1.0)
+    ax.set_xticks(range(size))
+    ax.set_xticklabels(labels)
+    ax.set_yticks(range(size))
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Opponent")
+    ax.set_ylabel("Agent")
+    ax.set_title(title)
+    for i in range(size):
+        for j in range(size):
+            value = matrix[i][j]
+            ax.text(j, i, f"{value * 100:.1f}%", ha="center", va="center",
+                    color="white" if value > 0.6 else "black")
+    fig.colorbar(image, ax=ax, label="rate")
+    fig.tight_layout()
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
 
 
 def _game_row(rec: GameRecord) -> list:
@@ -48,9 +76,14 @@ def save_results(result: TournamentResult, results_dir: Path) -> List[Path]:
     cfg = result.config
 
     rates = [[round(v, 6) for v in row] for row in m.win_rates]
+    draw_rates = [[round(v, 6) for v in row] for row in m.draw_rates]
     _write_matrix(results_dir / "win_rate_matrix.csv", m.names, rates)
     _write_matrix(results_dir / "win_count_matrix.csv", m.names, m.wins)
+    _write_matrix(results_dir / "draw_rate_matrix.csv", m.names, draw_rates)
     _write_matrix(results_dir / "draw_count_matrix.csv", m.names, m.draws)
+
+    _save_heatmap(results_dir / "win_rate_matrix.png", m.names, rates, "Win Rate Matrix")
+    _save_heatmap(results_dir / "draw_rate_matrix.png", m.names, draw_rates, "Draw Rate Matrix", cmap="Blues")
 
     with (results_dir / "game_results.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
@@ -79,6 +112,7 @@ def save_results(result: TournamentResult, results_dir: Path) -> List[Path]:
             "heuristics": m.names,
             "win_rate": rates,
             "win_count": m.wins,
+            "draw_rate": draw_rates,
             "draw_count": m.draws,
             "games_played": m.games,
         },
