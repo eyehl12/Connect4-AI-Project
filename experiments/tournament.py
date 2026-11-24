@@ -57,9 +57,8 @@ class Matrices:
 
     Off-diagonal cells count games between the two distinct heuristics. Diagonal
     (self-play) cells count each game once from each instance's perspective, so
-    ``games`` there is twice the number of self-play games. ``draw_rates`` uses the
-    same ``games`` denominator as ``win_rates`` (draws / games played against that
-    opponent), so it is symmetric: ``draw_rates[i][j] == draw_rates[j][i]``.
+    ``games`` there is twice the number of self-play games. ``win_draw_rates`` uses
+    the same denominator and awards wins 1 point and draws 0.5 points.
     """
     names: List[str]
     wins: List[List[int]]
@@ -67,6 +66,7 @@ class Matrices:
     games: List[List[int]]
     win_rates: List[List[float]]
     draw_rates: List[List[float]]
+    win_draw_rates: List[List[float]]
 
 
 @dataclass
@@ -194,7 +194,14 @@ def compute_matrices(records: Sequence[GameRecord], names: Sequence[str]) -> Mat
                  for i in range(n)]
     draw_rates = [[draws[i][j] / games[i][j] if games[i][j] else 0.0 for j in range(n)]
                   for i in range(n)]
-    return Matrices(list(names), wins, draws, games, win_rates, draw_rates)
+    win_draw_rates = [
+        [(wins[i][j] + 0.5 * draws[i][j]) / games[i][j] if games[i][j] else 0.0
+         for j in range(n)]
+        for i in range(n)
+    ]
+    return Matrices(
+        list(names), wins, draws, games, win_rates, draw_rates, win_draw_rates
+    )
 
 
 def heuristic_statistics(records: Sequence[GameRecord], names: Sequence[str]) -> Dict[str, dict]:

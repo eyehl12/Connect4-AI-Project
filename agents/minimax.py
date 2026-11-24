@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import time
 from dataclasses import dataclass
 from typing import Callable
@@ -41,24 +42,30 @@ class Minimax:
     def search(self, board: Board) -> SearchResult:
         """Pick the best column for ``board.current_player``.
 
-        Ties are broken deterministically: columns are tried center-outward and a
-        later column must be strictly better to replace the current best. The
-        board is restored to its original state before returning.
+        Center-first ordering controls search traversal. If several moves have the
+        same best score, one is selected randomly. Root moves use full alpha-beta
+        windows so tie detection compares exact scores rather than bounds.
         """
         if board.is_terminal():
             raise ValueError("Cannot search a finished game.")
         start = time.perf_counter()
         self._me = board.current_player
         self._nodes = 0
-        best_move = -1
+        best_moves = []
         best_score = -_INFINITY
         for col in board.legal_moves():
             board.make_move(col)
-            score = self._value(board, self.depth - 1, best_score, _INFINITY, False, 1)
+            score = self._value(
+                board, self.depth - 1, -_INFINITY, _INFINITY, False, 1
+            )
             board.undo_move()
-            if best_move == -1 or score > best_score:
-                best_move, best_score = col, score
-        return SearchResult(best_move, best_score, self._nodes, time.perf_counter() - start)
+            if score > best_score:
+                best_moves = [col]
+                best_score = score
+            elif score == best_score:
+                best_moves.append(col)
+        move = best_moves[0] if len(best_moves) == 1 else random.choice(best_moves)
+        return SearchResult(move, best_score, self._nodes, time.perf_counter() - start)
 
     def _value(self, board: Board, depth: int, alpha: float, beta: float,
                maximizing: bool, ply: int) -> float:

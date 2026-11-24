@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from agents.agent import Agent
 from agents.heuristics import opponent_awareness, weighted_connections
@@ -56,15 +57,16 @@ class MinimaxTests(unittest.TestCase):
             for depth in (1, 2, 3, 4):
                 board = play(moves)
                 me = board.current_player
-                best = None
+                scores = []
                 for col in board.legal_moves():
                     board.make_move(col)
                     score = reference_minimax(board, depth - 1, me, 1)
                     board.undo_move()
-                    if best is None or score > best[1]:
-                        best = (col, score)
+                    scores.append((col, score))
                 result = Minimax(eval_diff, depth).search(board)
-                self.assertEqual((result.move, result.score), best, (moves, depth))
+                best_score = max(score for _, score in scores)
+                self.assertEqual(result.score, best_score, (moves, depth))
+                self.assertIn(result.move, [col for col, score in scores if score == best_score])
 
     def test_search_restores_board_and_counts_nodes(self):
         board = play([3, 3, 4])
@@ -74,12 +76,19 @@ class MinimaxTests(unittest.TestCase):
         self.assertGreater(result.nodes_evaluated, 0)
         self.assertGreaterEqual(result.elapsed, 0)
 
-    def test_deterministic_tie_break_opens_in_center(self):
-        first = Minimax(weighted_connections, 2).search(Board())
-        second = Minimax(weighted_connections, 2).search(Board())
-        self.assertEqual((first.move, first.score, first.nodes_evaluated),
-                         (second.move, second.score, second.nodes_evaluated))
-        self.assertEqual(first.move, 3)
+    def test_tied_best_moves_are_selected_randomly(self):
+        board = Board()
+        with patch("agents.minimax.random.choice", side_effect=lambda moves: moves[-1]) as choose:
+            result = Minimax(weighted_connections, 1).search(board)
+        self.assertGreater(len(choose.call_args.args[0]), 1)
+        self.assertEqual(result.move, choose.call_args.args[0][-1])
+
+    def test_unique_best_move_does_not_use_random_tie_breaking(self):
+        board = play([0, 6, 1, 6, 2, 6])
+        with patch("agents.minimax.random.choice") as choose:
+            result = Minimax(opponent_awareness, 3).search(board)
+        self.assertEqual(result.move, 3)
+        choose.assert_not_called()
 
     def test_invalid_depth(self):
         with self.assertRaises(ValueError):

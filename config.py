@@ -1,6 +1,8 @@
 """Centralised configuration constants for the Connect Four AI project."""
 
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Tuple
 
 # Board geometry (changeable in a future stage, e.g. 10 x 11).
 ROWS = 6
@@ -29,3 +31,21 @@ MULTI_THREAT_SCORE = 50_000
 # Tournament.
 GAMES_PER_SIDE = 2  # games each side of a pairing plays as first player
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
+
+
+@dataclass(frozen=True)
+class ExperimentSettings:
+    """Shared defaults for a reproducible experiment."""
+
+    rows: int
+    cols: int
+    search_depth: int
+
+
+EXPERIMENT_SETTINGS = {
+    1: ExperimentSettings(rows=6, cols=7, search_depth=7),
+    2: ExperimentSettings(rows=6, cols=7, search_depth=7),
+    3: ExperimentSettings(rows=6, cols=7, search_depth=7),
+}
+SEARCH_DEPTHS: Tuple[int, ...] = (4, 7, 10)
+BOARD_SIZES: Tuple[Tuple[int, int], ...] = ((6, 7), (10, 11))

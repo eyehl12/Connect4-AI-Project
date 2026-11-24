@@ -22,8 +22,8 @@ GAME_COLUMNS = [
 ]
 
 OUTPUT_FILES = (
-    "win_rate_matrix.csv", "win_count_matrix.csv", "draw_rate_matrix.csv", "draw_count_matrix.csv",
-    "game_results.csv", "tournament_summary.json", "win_rate_matrix.png", "draw_rate_matrix.png",
+    "win_draw_rate_matrix.csv", "win_count_matrix.csv", "draw_count_matrix.csv",
+    "game_results.csv", "tournament_summary.json", "win_draw_rate_matrix.png",
 )
 
 
@@ -75,15 +75,24 @@ def save_results(result: TournamentResult, results_dir: Path) -> List[Path]:
     m = result.matrices
     cfg = result.config
 
+    win_draw_rates = [[round(v, 6) for v in row] for row in m.win_draw_rates]
     rates = [[round(v, 6) for v in row] for row in m.win_rates]
     draw_rates = [[round(v, 6) for v in row] for row in m.draw_rates]
-    _write_matrix(results_dir / "win_rate_matrix.csv", m.names, rates)
+    _write_matrix(results_dir / "win_draw_rate_matrix.csv", m.names, win_draw_rates)
     _write_matrix(results_dir / "win_count_matrix.csv", m.names, m.wins)
-    _write_matrix(results_dir / "draw_rate_matrix.csv", m.names, draw_rates)
     _write_matrix(results_dir / "draw_count_matrix.csv", m.names, m.draws)
 
-    _save_heatmap(results_dir / "win_rate_matrix.png", m.names, rates, "Win Rate Matrix")
-    _save_heatmap(results_dir / "draw_rate_matrix.png", m.names, draw_rates, "Draw Rate Matrix", cmap="Blues")
+    _save_heatmap(
+        results_dir / "win_draw_rate_matrix.png", m.names, win_draw_rates,
+        "Win-Draw Rate Matrix (Win = 1, Draw = 0.5)",
+    )
+    for legacy_name in (
+        "win_rate_matrix.csv", "draw_rate_matrix.csv",
+        "win_rate_matrix.png", "draw_rate_matrix.png",
+    ):
+        legacy_path = results_dir / legacy_name
+        if legacy_path.exists():
+            legacy_path.unlink()
 
     with (results_dir / "game_results.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.writer(handle)
@@ -92,6 +101,12 @@ def save_results(result: TournamentResult, results_dir: Path) -> List[Path]:
 
     summary = {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "experiment": 1,
+        "completed": len(result.records) == (
+            len(cfg.heuristics) * (len(cfg.heuristics) + 1) // 2
+            * cfg.games_per_side * 2
+        ),
+        "games_completed": len(result.records),
         "configuration": {
             "board_rows": cfg.rows,
             "board_cols": cfg.cols,
@@ -100,11 +115,18 @@ def save_results(result: TournamentResult, results_dir: Path) -> List[Path]:
             "heuristics": list(cfg.heuristics),
             "heuristic_abbreviations": {n: HEURISTIC_ABBREVIATIONS.get(n, n) for n in cfg.heuristics},
             "games_per_side": cfg.games_per_side,
+            "games_per_matchup": cfg.games_per_side * 2,
             "total_games": len(result.records),
+            "expected_total_games": (
+                len(cfg.heuristics) * (len(cfg.heuristics) + 1) // 2
+                * cfg.games_per_side * 2
+            ),
         },
         "conventions": {
+            "win_draw_rate": "(wins + 0.5 * draws) / games played against that opponent",
             "win_rate": "wins / games played against that opponent",
             "diagonal": "self-play: each game counted once per instance, so games = 2 x self-play games",
+            "move_selection": "A move is selected randomly among tied best-scoring moves.",
         },
         "total_duration_seconds": round(result.duration, 3),
         "heuristic_statistics": result.stats,
@@ -114,6 +136,7 @@ def save_results(result: TournamentResult, results_dir: Path) -> List[Path]:
             "win_count": m.wins,
             "draw_rate": draw_rates,
             "draw_count": m.draws,
+            "win_draw_rate": win_draw_rates,
             "games_played": m.games,
         },
     }
@@ -128,7 +151,7 @@ def format_matrix(matrices: Matrices) -> str:
     labels = [HEURISTIC_ABBREVIATIONS.get(n, n) for n in names]
     header = "Agent".ljust(8) + "".join(label.rjust(9) for label in labels)
     lines = [header]
-    for label, row in zip(labels, matrices.win_rates):
+    for label, row in zip(labels, matrices.win_draw_rates):
         lines.append(label.ljust(8) + "".join(f"{v * 100:8.1f}%" for v in row))
     return "\n".join(lines)
 
@@ -139,7 +162,7 @@ def format_summary(result: TournamentResult) -> str:
         f"Tournament: {len(result.records)} games, depth {cfg.depth}, "
         f"board {cfg.rows}x{cfg.cols}, {result.duration:.1f}s total",
         "",
-        "Win rate matrix (row agent vs column opponent):",
+        "Win-draw rate matrix (win = 1, draw = 0.5; row agent vs column opponent):",
         format_matrix(result.matrices),
         "",
         f"{'Heuristic':<26}{'W':>4}{'L':>4}{'D':>4}{'Win%':>8}{'AvgMove(s)':>12}{'Nodes/move':>12}",
